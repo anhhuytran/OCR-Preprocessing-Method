@@ -1,4 +1,4 @@
 test_images/
 *.jpg
 *.png
-tmp.py
+tmp*.py

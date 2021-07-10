@@ -21,12 +21,12 @@ import cv2
 import numpy as np
 from scipy.ndimage import interpolation as inter
 
-def correct_skew(image, delta=1, limit=30):
+def correct_skew(image, delta=1, limit=45):
     def determine_score(arr, angle):
         data = inter.rotate(arr, angle, reshape=False, order=0)
         histogram = np.sum(data, axis=1)
         score = np.sum((histogram[1:] - histogram[:-1]) ** 2)
-        return histogram, score
+        return histogram, score /1000000000
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1] 
@@ -45,21 +45,24 @@ def correct_skew(image, delta=1, limit=30):
     rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC, \
               borderMode=cv2.BORDER_REPLICATE)
 
-    return best_angle, rotated
+    return best_angle, rotated, scores
+
+
 
 if __name__ == '__main__':
-    image = cv2.imread('abc.png')
-    angle, rotated = correct_skew(image)
+    image = cv2.imread('demo3.png')
+    angle, rotated, score = correct_skew(image, 5)
+    print(score)
     print(angle)
 
 
     # grab the dimensions of the image and calculate the center of the
-    # image
-    (h, w) = image.shape[:2]
-    (cX, cY) = (w // 2, h // 2)
-    # rotate our image by 45 degrees around the center of the image
-    M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
-    rotated = cv2.warpAffine(image, M, (w, h))
+    # # image
+    # (h, w) = image.shape[:2]
+    # (cX, cY) = (w // 2, h // 2)
+    # # rotate our image by 45 degrees around the center of the image
+    # M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    # rotated = cv2.warpAffine(image, M, (w, h))
     cv2.imwrite("Rotated by 45 Degrees.png", rotated)
 
 

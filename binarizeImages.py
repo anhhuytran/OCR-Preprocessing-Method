@@ -17,27 +17,27 @@ def findThresholdVal(imgPath):
     pixels = list(img.getdata())
 
     thresholdVal = pixelsAVGVal(pixels)
-    foreground = list()
-    background = list()
+    # foreground = list()
+    # background = list()
 
-    while True:
-        for i in range(img.height):
-            for j in range(img.width):
-                if(pixels[i*j+j]<=thresholdVal):
-                    background.append(pixels[i*j+j])
-                else:
-                    foreground.append(pixels[i*j+j])
+    # while True:
+    #     for i in range(img.height):
+    #         for j in range(img.width):
+    #             if(pixels[i*j+j]<=thresholdVal):
+    #                 background.append(pixels[i*j+j])
+    #             else:
+    #                 foreground.append(pixels[i*j+j])
 
-        AVGVal = int((pixelsAVGVal(foreground) + pixelsAVGVal(background)) / 2)
-        # print(AVGVal)
-        foreground.clear()
-        background.clear()
+    #     AVGVal = int((pixelsAVGVal(foreground) + pixelsAVGVal(background)) / 2)
+    #     # print(AVGVal)
+    #     foreground.clear()
+    #     background.clear()
 
-        if(abs(AVGVal-thresholdVal) > 1):
-            # print(thresholdVal)
-            thresholdVal = AVGVal
-        else:
-            break
+    #     if(abs(AVGVal-thresholdVal) > 1):
+    #         # print(thresholdVal)
+    #         thresholdVal = AVGVal
+    #     else:
+    #         break
 
     return thresholdVal
 
@@ -56,4 +56,4 @@ def binarizeImage(srcImgPath, dstImgPath):
     img.save(dstImgPath)
 
 
-binarizeImage('test_images/007.jpg', 'test_images/007_binary.jpg')
+binarizeImage('demo1.jpg', 'demo_res_.jpg')
