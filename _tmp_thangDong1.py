@@ -41,26 +41,40 @@ cv2.drawContours(img, contours, -1, (0, 255, 0), 1)
 points = findPointList(contours)
 points.sort()
 
-for point in points:
-    cv2.circle(img, point, radius=3, color=(0, 0, 255), thickness = -1)
+points = zip(*points)
+points = list(points)
 
-# mask = np.zeros(gray.shape)
+
+f = CubicSpline(points[0], points[1], bc_type='natural')
+x_new = np.linspace(0, img.shape[1], img.shape[1] + 1)
+y_new = f(x_new)
+
+# for point in points:
+#     cv2.circle(img, point, radius=3, color=(0, 0, 255), thickness = -1)
+
+mask = np.zeros(gray.shape)
 # pts = np.array(points, dtype=np.int32)
 # cv2.polylines(mask, [pts], False, 255, thickness=1, lineType=cv2.LINE_AA)
 
 mainAxis = mask.shape[0] / 2
+for x in range(0, mask.shape[1]):
+    delta = mainAxis - y_new[x]
 
-for y in range(0, mask.shape[1]):
-    maskPoint = mainAxis
-    for x in range(0, mask.shape[0]):
-        if mask[x][y] == 255:
-            maskPoint = x
-            break
+    for y in range(0, gray.shape[0]):
+        if bin[y][x] == 0:
+            new[int(y + delta)][x] = 0
 
-    delta = mainAxis - maskPoint
+# for y in range(0, mask.shape[1]):
+#     maskPoint = mainAxis
+#     for x in range(0, mask.shape[0]):
+#         if mask[x][y] == 255:
+#             maskPoint = x
+#             break
 
-    for x in range(0, gray.shape[0]):
-        if bin[x][y] == 0:
-            new[int(x + delta)][y] = 0
+#     delta = mainAxis - maskPoint
+
+#     for x in range(0, gray.shape[0]):
+#         if bin[x][y] == 0:
+#             new[int(x + delta)][y] = 0
 
 cv2.imwrite('abczyx.png', new)
