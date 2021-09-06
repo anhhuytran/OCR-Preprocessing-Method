@@ -2,16 +2,13 @@ import cv2
 import numpy as np
 from scipy.interpolate import CubicSpline, UnivariateSpline
 import numpy as np
+import random
 
-def findPointList(contours):
-    res = []
-    for contour in contours:
-        M = cv2.moments(contour)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        res.append((cX, cY))
-
-    return res
+def center(contour):
+    M = cv2.moments(contour)
+    cX = int(M["m10"] / M["m00"])
+    cY = int(M["m01"] / M["m00"])
+    return cX, cY
 
 def get_next_contour(mask, contour):
     maxY, maxX = mask.shape
@@ -23,16 +20,41 @@ def get_next_contour(mask, contour):
     current_contour = mask[cY][cX]
     while cX < maxX:
         if mask[cY][cX] != current_contour and mask[cY][cX] != 0:
-            return current_contour, mask[cY][cX]
+            return [int(current_contour) - 1, int(mask[cY][cX]) - 1]
         cX += 1
 
-    return current_contour, None
+    return [int(current_contour) - 1, None]
 
 def connect_pair(pairs):
-    for pair in pairs:
-        return
+    while True:
+        exit_flag = True
 
-img = cv2.imread('demo7.png')
+        i = 0
+        while i < len(pairs):
+            if pairs[i][-1] is None:
+                i += 1
+                continue
+
+            j = 0
+            while j < len(pairs):
+                if i != j and pairs[i][-1] == pairs[j][0]:
+                    pairs[i].pop()
+                    pairs[i].extend(pairs[j])
+
+                    pairs.pop(j)
+                    if j < i:
+                        i -= 1
+                    
+                    exit_flag = False
+                    break
+                j += 1
+
+            i += 1
+
+        if exit_flag:
+            return
+
+img = cv2.imread('demo6.png')
 gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 bin = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 20)
 
@@ -40,35 +62,55 @@ revert = 255 - bin
 dilate = cv2.dilate(revert, None, iterations=2)
 
 contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-contours.sort(key=lambda ctr: cv2.boundingRect(ctr)[0] + cv2.boundingRect(ctr)[1] * img.shape[1])
 
 check = [0] * len(contours)
-lines = []
 mask = np.zeros(gray.shape)
 for i, contour in enumerate(contours):
-    cv2.fillPoly(mask, pts =[contour], color= i + 1)
+    cv2.fillPoly(mask, pts =[contour], color = i + 1)
 
-pair = []
+pairs = []
 for contour in contours:
-    pair.append(get_next_contour(mask, contour))
+    pairs.append(get_next_contour(mask, contour))
 
-print(pair)
-lines = connect_pair(pair)
+connect_pair(pairs)
+print(pairs)
+for pair in pairs:
+    pair.pop()
 
-cv2.imwrite('abczyx.png', mask)
+    center_points = []
+    for contour_index in pair:
+        center_points.append(center(contours[contour_index]))
+
+    color1 = list(np.random.choice(range(256), size=3))
+    color =[int(color1[0]), int(color1[1]), int(color1[2])] 
+    for point in center_points:
+        cv2.circle(img, point, radius=10, color = color, thickness=-1)
+
+
+cv2.imwrite('abczyx.png', img)
 exit()
 
 
 
 
 
+# def findPointList(contours):
+#     res = []
+#     for contour in contours:
+#         M = cv2.moments(contour)
+#         cX = int(M["m10"] / M["m00"])
+#         cY = int(M["m01"] / M["m00"])
+#         res.append((cX, cY))
+
+#     return res
 
 
-new = np.zeros(img.shape) + 255
 
-cv2.drawContours(img, contours, -1, (0, 255, 0), 1)
-points = findPointList(contours)
-points.sort()   
+# new = np.zeros(img.shape) + 255
+
+# cv2.drawContours(img, contours, -1, (0, 255, 0), 1)
+# points = findPointList(contours)
+# points.sort()   
 
 
 # #convert point list
