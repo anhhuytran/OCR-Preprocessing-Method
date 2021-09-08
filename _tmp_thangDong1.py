@@ -144,7 +144,7 @@ for contour_index, contour in enumerate(contours):
 
 cv2.imwrite('result_dilate.png', dilate)
 cv2.imwrite('result_cnt.png', img_cnt)
-exit()
+# exit()
 
 
 
@@ -162,6 +162,8 @@ for contour in contours:
 pairs = [None] * len(contours)
 contours_distance = [[-1, 0]] * len(contours)
 for i, contour in enumerate(contours):
+    
+    
     next_contour_index, distance = get_next_contour(mask, i, contours_moments[i], FIND_NEXT_WIDTH, FIND_NEXT_MAX_DISTANCE)
     if next_contour_index is not None:
         if contours_distance[next_contour_index][0] == -1:
@@ -203,14 +205,18 @@ for chain in chains:
     for i, contour_index in enumerate(chain):
         cv2.circle(img_fncnt, center_points[i], radius=10, color = color, thickness=-1)
         cv2.putText(img_fncnt , str(contour_index), center_points[i], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 100), 2)
-
     
     # calculating CubicSpline for each chain
     center_points.sort()
     _center_points = zip(*center_points)
     _center_points = list(_center_points)
     lines.append((mainAxis, CubicSpline(_center_points[0], _center_points[1])))
-    
+
+cv2.imwrite('result_fnct.png', img_fncnt)
+exit()
+
+
+
 # create list store place of contour in chains
 pos = [-1] * len(contours)
 for i, chain in enumerate(chains):
@@ -235,5 +241,4 @@ for y in range(0, h):
 
 print('Done')
 
-cv2.imwrite('result_fnct.png', img_fncnt)
 cv2.imwrite('result.png', new)
