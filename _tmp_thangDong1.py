@@ -5,24 +5,11 @@ import numpy as np
 import random
 from operator import add, sub
 
-FILE_NAME = 'demo6.png'
+# FILE_NAME = 'demo6.png'
 
-DILATE_KERNEL = None        #np.ones((3,5), np.uint8)
-DILATE_LITERATION = 3
-MINIMUM_CONTOUR_SIZE = 100
-MAXIMUM_CONTOUR_SIZE = 100000
-
-FIND_NEXT_WIDTH = 10
-FIND_NEXT_MAX_DISTANCE = 60
-FIND_NEXT_MAX_DEGREE = 45
-
-MINIMUM_LEN_SPLINE = 4
-
-# FILE_NAME = 'demo2.jpg'
-
-# DILATE_KERNEL = np.ones((3,5), np.uint8)
-# DILATE_LITERATION = 4
-# MINIMUM_CONTOUR_SIZE = 500
+# DILATE_KERNEL = None        #np.ones((3,5), np.uint8)
+# DILATE_LITERATION = 3
+# MINIMUM_CONTOUR_SIZE = 100
 # MAXIMUM_CONTOUR_SIZE = 100000
 
 # FIND_NEXT_WIDTH = 10
@@ -30,6 +17,19 @@ MINIMUM_LEN_SPLINE = 4
 # FIND_NEXT_MAX_DEGREE = 45
 
 # MINIMUM_LEN_SPLINE = 4
+
+FILE_NAME = 'demo2.jpg'
+
+DILATE_KERNEL = np.ones((3,5), np.uint8)
+DILATE_LITERATION = 3
+MINIMUM_CONTOUR_SIZE = 600
+MAXIMUM_CONTOUR_SIZE = 100000
+
+FIND_NEXT_WIDTH = 10
+FIND_NEXT_MAX_DISTANCE = 60
+FIND_NEXT_MAX_DEGREE = 45
+
+MINIMUM_LEN_SPLINE = 4
 
 def center(M):
     cX = int(M["m10"] / M["m00"])
@@ -132,7 +132,7 @@ def find_function(chain, contours_moments):
     _center_points = list(_center_points)
     if len(center_points) < MINIMUM_LEN_SPLINE:
         return CubicSpline(_center_points[0], _center_points[1])
-    return UnivariateSpline(_center_points[0], _center_points[1])
+    return CubicSpline(_center_points[0], _center_points[1])
 
 def len_route(route):
     sum = 0.0
@@ -168,7 +168,7 @@ def find_neighbor(mask, current_contour, begin_point, f, x_function = add):
                 break
             
             ### draw line
-            img_fncnt[_y][_x] += 100
+            # img_fncnt[_y][_x] += 100
 
             if mask[_y][_x] != 0:
                 if int(mask[_y][_x]) - 1 != current_contour:
@@ -281,9 +281,10 @@ for chain in chains:
 # isolate_contours -> 0: contour_index, 1: chain_index, 2: distance, 3: type
 # add isolate element to chain
 long_chains_done = []
+closed_contours = []
 while True:
     i = 0
-    closed_contours = []
+    closed_contours.clear()
     while i < len(long_chains):
         prev_cnt, next_cnt = find_closest_element(mask, long_chains[i], contours_moments)
         if prev_cnt[0] is None and next_cnt[0] is None:
@@ -321,24 +322,57 @@ while True:
     if not have_insert:
         break
     
-print('Done: ',long_chains_done)
-print('Isole: ', long_chains)
+connect_chain = []
+for i in range(0, len(long_chains)):
+    connect_chain.append([[None, -1], [None, -1]])        
+for chain_index, closed_contour in enumerate(closed_contours):
+    for t, contour in enumerate(closed_contour):
+        if contour[0] is None:
+            continue
 
+        for i, chain in enumerate(long_chains):
+            if contour[0] == chain[t - 1]:
+                if connect_chain[i][t - 1][1] == -1 or contour[1] < connect_chain[i][t - 1][1]:
+                    connect_chain[i][t - 1][0] = chain_index
+                    connect_chain[i][t - 1][1] = contour[1]
+                break
 
-chains = long_chains_done
+while True:
+    i = 0
+    while i < len(connect_chain) and connect_chain[i][1][0] is None:
+        i+= 1
+    if i == len(connect_chain):
+        break
+
+    next_chain_index = connect_chain[i][1][0]
+    if connect_chain[next_chain_index][0][0] == i:
+        long_chains[i].extend(long_chains[next_chain_index])
+
+        connect_chain[i][1] = connect_chain[next_chain_index][1]
+        connect_chain[next_chain_index][1] = [None, -2]
+    else:
+        connect_chain[i][1] = [None, -1]
+i = 0
+while i < len(long_chains):
+    if connect_chain[i][1][1] == -2:
+        long_chains.pop(i)
+        connect_chain.pop(i)
+    else:
+        i += 1
+
+chains = long_chains_done + long_chains
+for chain in chains:
+    print(chain)
 
 lines = []
 for chain in chains:
-    
     [x, y, w, h] = cv2.boundingRect(contours[chain[0]])
-    mainAxis = y + int(h / 2)
+    main_axis = y + int(h / 2)
 
-    # caculate center point list for each chain
+    ### drawing center point on original image
     center_points= []
     for contour_index in chain:
         center_points.append(center(contours_moments[contour_index]))
-
-    ### drawing center point on original image
     color1 = list(np.random.choice(range(256), size=3))
     color =[int(color1[0]), int(color1[1]), int(color1[2])] 
     for i, contour_index in enumerate(chain):
@@ -346,14 +380,9 @@ for chain in chains:
         cv2.putText(img_fncnt , str(contour_index), center_points[i], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 100), 2)
     
     # calculating CubicSpline for each chain
-    center_points.sort()
-    _center_points = zip(*center_points)
-    _center_points = list(_center_points)
-    lines.append((mainAxis, CubicSpline(_center_points[0], _center_points[1])))
+    lines.append((main_axis, find_function(chain, contours_moments)))
 
 cv2.imwrite('result_fnct.png', img_fncnt)
-# exit()
-
 
 
 # create list store place of contour in chains
@@ -369,14 +398,18 @@ h, w = new.shape
 
 for y in range(0, h):
     for x in range(0, w):
-        if bin[y][x] == 0 and mask[y][x] != 0: 
-            mainAxis, f = lines[pos[int(mask[y][x] - 1)]]
-            if mainAxis == -1:
-                continue
+        if bin[y][x] == 0 and mask[y][x] != 0:
+            chain_index = pos[int(mask[y][x] - 1)]
+            if chain_index != -1:
+                mainAxis, f = lines[chain_index]
+                if mainAxis == -1:
+                    continue
 
-            new_y = int(y + mainAxis - f(x))
-            if 0<= new_y < h:
-                new[new_y][x] = 0
+                new_y = int(y + mainAxis - f(x))
+                if 0<= new_y < h:
+                    new[new_y][x] = 0
+            else:
+                pass
 
 print('Done')
 
