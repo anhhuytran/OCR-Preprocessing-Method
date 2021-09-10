@@ -286,7 +286,6 @@ for chain in chains:
 
 # isolate_contours -> 0: contour_index, 1: chain_index, 2: distance, 3: type
 # add isolate element to chain
-long_chains.sort()
 long_chains_done = []
 closed_contours = [None] * len(long_chains)
 while True:

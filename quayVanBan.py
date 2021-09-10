@@ -58,6 +58,6 @@ def correct_skew(image, delta = 0.01, range = 45):
 
 
 if __name__ == '__main__':
-    image = cv2.imread('aa.jpg', 0)
+    image = cv2.imread('demo/demo1.png', 0)
 
     cv2.imwrite("res11.png", correct_skew(image))
