@@ -6,35 +6,18 @@ import numpy as np
 import random
 from operator import add, sub
 
-# FILE_NAME = 'demo6.png'
+FILE_NAME = 'demo/demo1.png'
 
-# DILATE_KERNEL = None        #np.ones((3,5), np.uint8)
-# DILATE_LITERATION = 3
-# MIN_CONTOUR_SIZE = 100
-# MAX_CONTOUR_SIZE = 100000
-# MAX_CONTOUR_WIDTH = 1000
-# MAX_CONTOUR_HEIGHT = 500
-
-# FIND_NEXT_WIDTH = 10
-# FIND_NEXT_MAX_DISTANCE = 60
-# FIND_NEXT_MAX_DEGREE = 45
-
-# MINIMUM_LEN_SPLINE = 4
-# SPLINE_S = 10
-
-
-FILE_NAME = 'demo2.jpg'
-
-DILATE_KERNEL = np.ones((3,5), np.uint8)
-DILATE_LITERATION = 4
-MIN_CONTOUR_SIZE = 500
+DILATE_KERNEL = None  #np.ones((3,5), np.uint8)
+DILATE_LITERATION = 3
+MIN_CONTOUR_SIZE = 80
 MAX_CONTOUR_SIZE = 100000
 MAX_CONTOUR_WIDTH = 1000
 MAX_CONTOUR_HEIGHT = 500
 
 FIND_NEXT_WIDTH = 10
-FIND_NEXT_MAX_DISTANCE = 100
-FIND_NEXT_MAX_DEGREE = 45
+FIND_NEXT_MAX_DISTANCE = 60
+FIND_NEXT_MAX_DEGREE = 30
 
 MINIMUM_LEN_SPLINE = 4
 SPLINE_S = 1000
@@ -303,6 +286,7 @@ for chain in chains:
 
 # isolate_contours -> 0: contour_index, 1: chain_index, 2: distance, 3: type
 # add isolate element to chain
+long_chains.sort()
 long_chains_done = []
 closed_contours = [None] * len(long_chains)
 while True:
@@ -348,9 +332,8 @@ while True:
     if not have_insert:
         break
 
-
-for i, chain in enumerate(long_chains):
-    print(i ,': ', chain, closed_contours[i])
+# for i, chain in enumerate(long_chains):
+#     print(i ,': ', chain, closed_contours[i])
 
 # connect chains together
 print('Connect chains together')   
@@ -381,9 +364,14 @@ while True:
         long_chains[i].extend(long_chains[next_chain_index])
 
         connect_chain[i][1] = connect_chain[next_chain_index][1]
-        connect_chain[next_chain_index][1] = [None, -2]
+        next_next_chain_index = connect_chain[i][1][0]
+        if next_next_chain_index is not None and connect_chain[next_next_chain_index][0][0] == next_chain_index:
+            connect_chain[next_next_chain_index][0][0] = i
+
+        connect_chain[next_chain_index][1] = [None, -2]  # -2 the hien da gan vao 1 chain khac
     else:
         connect_chain[i][1] = [None, -1]
+
 i = 0
 while i < len(long_chains):
     if connect_chain[i][1][1] == -2:
@@ -408,8 +396,7 @@ for chain in chains:
     
     # calculating CubicSpline for each chain
     f = find_function(chain, contours_moments)
-    main_axis = f(0)
-    lines.append((main_axis, f))
+    lines.append([-1, f])
 
     ### drawing a line
     drawLine(img_fncnt, f, color)
@@ -417,15 +404,29 @@ for chain in chains:
 
 cv2.imwrite('result_fnct.png', img_fncnt)
 
-
 # draw isolate contour
 for contour_index, _, _, _ in isolate_contours:
     f = linear_function(contours_moments[contour_index])
     if f is not None:
-        main_axis = f(0)
-
         chains.append([contour_index])
-        lines.append((main_axis, f))
+        lines.append([-1, f])
+
+# add the start point (main_axis)
+for i, line in enumerate(lines):
+    f = line[1]
+    begin_contour_index = chains[i][0]
+    
+    x = center(contours_moments[begin_contour_index])[0]
+    while True:
+        x -= 1
+        y = f(x)
+
+        _x, _y = int(x), int(y)
+        main_axis = _y
+        if _x < 0 or _x >= w or _y < 0 or _y >= h or mask[_y][_x] == 0:
+            break
+    line[0] = main_axis
+            
 
 # create list store place of contour in chains
 pos = [-1] * len(contours)
