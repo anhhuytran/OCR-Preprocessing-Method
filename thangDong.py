@@ -1,3 +1,4 @@
+import enum
 import cv2
 import numpy as np
 from scipy.interpolate import CubicSpline, UnivariateSpline
@@ -9,33 +10,51 @@ from operator import add, sub
 
 # DILATE_KERNEL = None        #np.ones((3,5), np.uint8)
 # DILATE_LITERATION = 3
-# MINIMUM_CONTOUR_SIZE = 100
-# MAXIMUM_CONTOUR_SIZE = 100000
+# MIN_CONTOUR_SIZE = 100
+# MAX_CONTOUR_SIZE = 100000
+# MAX_CONTOUR_WIDTH = 1000
+# MAX_CONTOUR_HEIGHT = 500
 
 # FIND_NEXT_WIDTH = 10
 # FIND_NEXT_MAX_DISTANCE = 60
 # FIND_NEXT_MAX_DEGREE = 45
 
 # MINIMUM_LEN_SPLINE = 4
+# SPLINE_S = 10
+
 
 FILE_NAME = 'demo2.jpg'
 
 DILATE_KERNEL = np.ones((3,5), np.uint8)
-DILATE_LITERATION = 3
-MINIMUM_CONTOUR_SIZE = 600
-MAXIMUM_CONTOUR_SIZE = 100000
+DILATE_LITERATION = 4
+MIN_CONTOUR_SIZE = 500
+MAX_CONTOUR_SIZE = 100000
+MAX_CONTOUR_WIDTH = 1000
+MAX_CONTOUR_HEIGHT = 500
 
 FIND_NEXT_WIDTH = 10
-FIND_NEXT_MAX_DISTANCE = 60
+FIND_NEXT_MAX_DISTANCE = 100
 FIND_NEXT_MAX_DEGREE = 45
 
 MINIMUM_LEN_SPLINE = 4
+SPLINE_S = 1000
+
 
 def center(M):
     cX = int(M["m10"] / M["m00"])
     cY = int(M["m01"] / M["m00"])
     return cX, cY
 
+def linear_function(M):
+    c_x, c_y = center(M)
+    theta = 0.5 * np.arctan2(2 * M["mu11"], M["mu20"] - M["mu02"])
+    alpha = np.tan(theta)
+    angle = np.degrees(np.arctan(alpha))
+    if angle < -FIND_NEXT_MAX_DEGREE or angle > FIND_NEXT_MAX_DEGREE:
+        return None
+
+    return lambda x : c_y + alpha * (x - c_x)
+    
 def get_next_contour(mask, current_contour, M, delta, max_distance):
     h, w = mask.shape
 
@@ -110,7 +129,9 @@ def connect_pair(pairs):
 
 def check_size(contour):
     area = cv2.contourArea(contour)
-    return area > MINIMUM_CONTOUR_SIZE and area < MAXIMUM_CONTOUR_SIZE
+    [x, y, w, h] = cv2.boundingRect(contour)
+
+    return area > MIN_CONTOUR_SIZE and area < MAX_CONTOUR_SIZE and w < MAX_CONTOUR_WIDTH and h < MAX_CONTOUR_HEIGHT
 
 def find_function(chain, contours_moments):
     center_points= []
@@ -132,7 +153,7 @@ def find_function(chain, contours_moments):
     _center_points = list(_center_points)
     if len(center_points) < MINIMUM_LEN_SPLINE:
         return CubicSpline(_center_points[0], _center_points[1])
-    return CubicSpline(_center_points[0], _center_points[1])
+    return UnivariateSpline(_center_points[0], _center_points[1], s=SPLINE_S)
 
 def len_route(route):
     sum = 0.0
@@ -189,7 +210,6 @@ def drawLine(img, f, color, begin = None, end = None):
         if 0 <= y < h:
             img[y][x] = color
 
-
 def find_closest_element(mask, chain, contours_moments):
     f = find_function(chain, contours_moments)
     if f is None:
@@ -244,6 +264,7 @@ for contour in contours:
     contours_moments.append(cv2.moments(contour))
 
 # get pair of 2 words
+print('Find pairs')
 pairs = [None] * len(contours)
 contours_distance = [[-1, 0]] * len(contours)
 for i, contour in enumerate(contours):
@@ -264,12 +285,14 @@ for i, contour in enumerate(contours):
 #     print(i, pair)
 
 # connect pair to chains
+print('Connect pairs...')
 chains = connect_pair(pairs)
 # ## print chains
 # for chain in chains:
 #     print(chain)
 
 # extend the long chains
+print('Extend the chains with isolate...')
 long_chains = []
 isolate_contours = []
 for chain in chains:
@@ -281,18 +304,20 @@ for chain in chains:
 # isolate_contours -> 0: contour_index, 1: chain_index, 2: distance, 3: type
 # add isolate element to chain
 long_chains_done = []
-closed_contours = []
+closed_contours = [None] * len(long_chains)
 while True:
     i = 0
-    closed_contours.clear()
     while i < len(long_chains):
-        prev_cnt, next_cnt = find_closest_element(mask, long_chains[i], contours_moments)
-        if prev_cnt[0] is None and next_cnt[0] is None:
-            long_chains_done.append(long_chains[i])
-            long_chains.pop(i)
-        else:
-            closed_contours.append((prev_cnt, next_cnt))
-            i += 1
+        if closed_contours[i] is None:
+            prev_cnt, next_cnt = find_closest_element(mask, long_chains[i], contours_moments)
+            if prev_cnt[0] is None and next_cnt[0] is None:
+                long_chains_done.append(long_chains[i])
+                long_chains.pop(i)
+                closed_contours.pop(i)
+                continue
+            else:
+                closed_contours[i] = (prev_cnt, next_cnt)
+        i += 1
 
     for chain_index, closed_contours_pair in enumerate(closed_contours):
         for i, closed_contour in enumerate(closed_contours_pair):
@@ -315,13 +340,20 @@ while True:
                 long_chains[isolate_contours[i][1]].insert(0, isolate_contours[i][0])
             else:
                 long_chains[isolate_contours[i][1]].append(isolate_contours[i][0])
+            closed_contours[isolate_contours[i][1]] = None
             isolate_contours.pop(i)
             have_insert = True
         else:
             i += 1
     if not have_insert:
         break
-    
+
+
+for i, chain in enumerate(long_chains):
+    print(i ,': ', chain, closed_contours[i])
+
+# connect chains together
+print('Connect chains together')   
 connect_chain = []
 for i in range(0, len(long_chains)):
     connect_chain.append([[None, -1], [None, -1]])        
@@ -361,14 +393,9 @@ while i < len(long_chains):
         i += 1
 
 chains = long_chains_done + long_chains
-for chain in chains:
-    print(chain)
 
 lines = []
 for chain in chains:
-    [x, y, w, h] = cv2.boundingRect(contours[chain[0]])
-    main_axis = y + int(h / 2)
-
     ### drawing center point on original image
     center_points= []
     for contour_index in chain:
@@ -380,10 +407,25 @@ for chain in chains:
         cv2.putText(img_fncnt , str(contour_index), center_points[i], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 100), 2)
     
     # calculating CubicSpline for each chain
-    lines.append((main_axis, find_function(chain, contours_moments)))
+    f = find_function(chain, contours_moments)
+    main_axis = f(0)
+    lines.append((main_axis, f))
+
+    ### drawing a line
+    drawLine(img_fncnt, f, color)
+
 
 cv2.imwrite('result_fnct.png', img_fncnt)
 
+
+# draw isolate contour
+for contour_index, _, _, _ in isolate_contours:
+    f = linear_function(contours_moments[contour_index])
+    if f is not None:
+        main_axis = f(0)
+
+        chains.append([contour_index])
+        lines.append((main_axis, f))
 
 # create list store place of contour in chains
 pos = [-1] * len(contours)
@@ -402,9 +444,6 @@ for y in range(0, h):
             chain_index = pos[int(mask[y][x] - 1)]
             if chain_index != -1:
                 mainAxis, f = lines[chain_index]
-                if mainAxis == -1:
-                    continue
-
                 new_y = int(y + mainAxis - f(x))
                 if 0<= new_y < h:
                     new[new_y][x] = 0
